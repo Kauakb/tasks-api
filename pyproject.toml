@@ -1,0 +1,6 @@
+[tool.ruff]
+src = ["tasks-api"]
+
+[tool.pytest.ini_options]
+pythonpath = ["tasks-api"]
+testpaths = ["tests"]
