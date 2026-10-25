@@ -11,13 +11,13 @@ Early stage. The app lives in `tasks-api/main.py` (note the nested `tasks-api/` 
 Dependencies are pinned in `requirements.txt` and installed into the project's `.venv`:
 
 ```
-.venv\Scripts\pip install -r requirements.txt
+.\.venv\Scripts\pip install -r requirements.txt
 ```
 
 ## Running
 
 ```
-.venv\Scripts\python -m uvicorn main:app --app-dir tasks-api --reload
+.\.venv\Scripts\python -m uvicorn main:app --app-dir tasks-api --reload
 ```
 
 Serves on http://127.0.0.1:8000 (interactive docs at `/docs`). `--reload` restarts the server when code changes.
@@ -27,11 +27,11 @@ Serves on http://127.0.0.1:8000 (interactive docs at `/docs`). `--reload` restar
 Dev tools (ruff, pytest, httpx) are in `requirements-dev.txt`:
 
 ```
-.venv\Scripts\pip install -r requirements-dev.txt
-.venv\Scripts\ruff check .
-.venv\Scripts\ruff format --check .
-.venv\Scripts\pytest
-.venv\Scripts\pytest tests/test_main.py::test_home
+.\.venv\Scripts\pip install -r requirements-dev.txt
+.\.venv\Scripts\ruff check .
+.\.venv\Scripts\ruff format --check .
+.\.venv\Scripts\pytest
+.\.venv\Scripts\pytest tests/test_main.py::test_home
 ```
 
 The last line runs a single test. Config is in `pyproject.toml`: `tasks-api/` is on pytest's import path (the hyphen means it can't be a package), and ruff treats it as first-party code.
