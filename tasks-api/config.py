@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
-# each line means name: type = default value
+    # each line means name: type = default value
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "tasks_api"
