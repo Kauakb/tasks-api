@@ -1,0 +1,20 @@
+meta {
+    name: Create Problem
+    type: http
+    seq: 3
+}
+
+post {
+    url: {{baseUrl}}/problems
+    body: json
+    auth: none
+}
+
+body:json{
+    {
+    "title": "Valid Parenthes",
+    "platform": "leetcode",
+    "topics": ["stacks", "string"],
+    "difficulty": "easy"
+    }
+}
