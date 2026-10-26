@@ -20,3 +20,8 @@ jobs:
         run: ruff format --check .
       - name: pytest
         run: pytest
+
+- name: pytest
+  run: pytest
+  env:
+    DB_PASSWORD: ci-not-used
