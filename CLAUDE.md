@@ -9,8 +9,10 @@ Early stage. The app code lives in the nested `tasks-api/` directory inside the 
 - `main.py`: the FastAPI app, with two placeholder routes, `GET /` and `GET /about`.
 - `config.py`: a `Settings` class (pydantic-settings) that reads the database settings from `.env`. Import the shared `settings` object from here.
 - `database.py`: builds the SQLAlchemy `engine` (PostgreSQL through the psycopg driver) from `settings`, plus `SessionLocal`, which opens a new session per call.
+- `models.py`: `Base` (the parent of all models) and the `Problem` model (`problems` table). Allowed values and text rules belong in schemas, not here.
+- `create_tables.py`: a script run by hand that creates the missing tables with `Base.metadata.create_all`. It never changes an existing table: after changing a model, drop the table and run it again. Switch to Alembic migrations before storing real data.
 
-No tables or endpoints use the database yet.
+No endpoints use the database yet.
 
 ## Setup
 
@@ -29,6 +31,13 @@ To test the connection:
 ```
 $env:PYTHONPATH = "tasks-api"
 .\.venv\Scripts\python -c "from sqlalchemy import text; from database import engine; print(engine.connect().execute(text('select version()')).scalar())"
+```
+
+To create the tables:
+
+```
+$env:PYTHONPATH = "tasks-api"
+.\.venv\Scripts\python tasks-api\create_tables.py
 ```
 
 ## Running
