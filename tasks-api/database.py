@@ -24,3 +24,9 @@ engine = create_engine(database_URL)
 
 # each call to sessionlocal() opens a new session that uses the engine
 SessionLocal = sessionmaker(bind=engine)
+
+
+# gives each request its own session, and closes it when request ends
+def get_db():
+    with SessionLocal() as db:
+        yield db
