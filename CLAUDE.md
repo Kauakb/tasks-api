@@ -62,11 +62,17 @@ Dev tools (ruff, pytest, httpx) are in `requirements-dev.txt`:
 
 The last line runs a single test. Config is in `pyproject.toml`: `tasks-api/` is on pytest's import path (the hyphen means it can't be a package), and ruff treats it as first-party code.
 
-Run `ruff format --check .` on its own before pushing. With PowerShell's `;`, a ruff failure is easy to miss behind pytest's output.
+Before every push, run all three checks with this command. It stops at the first failure, so a ruff error can't hide behind pytest's output:
+
+```
+.\.venv\Scripts\ruff check .; if ($?) { .\.venv\Scripts\ruff format --check . }; if ($?) { .\.venv\Scripts\pytest }
+```
+
+`if ($?)` runs the next command only if the last one succeeded (PowerShell 5.1 has no `&&`).
 
 ## CI
 
-`.github/workflows/ci.yml` runs the same three checks on every PR and on every push to `production`. The PR `production → main` stays open so each push gets checked. CI has no PostgreSQL and no `.env` yet. Both are needed once tests import `database.py`.
+`.github/workflows/ci.yml` runs the same three checks on every PR and on every push to `production`. The PR `production → main` stays open so each push gets checked. CI sets a placeholder `DB_PASSWORD` for the pytest step, because `main.py` imports `database.py` and `Settings()` requires it. There's no PostgreSQL service yet, so tests must not query the database. Add one (with a matching password) before writing tests that do.
 
 ## Bruno
 
