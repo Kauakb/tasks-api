@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Early stage. The app lives in `tasks-api/main.py` (note the nested `tasks-api/` directory inside the repo root): a FastAPI app with two placeholder routes, `GET /` and `GET /about`. Tests are in `tests/`. No database yet.
+Early stage. The app code lives in the nested `tasks-api/` directory inside the repo root. Tests are in `tests/`.
+
+- `main.py`: the FastAPI app, with two placeholder routes, `GET /` and `GET /about`.
+- `config.py`: a `Settings` class (pydantic-settings) that reads the database settings from `.env`. Import the shared `settings` object from here.
+- `database.py`: builds the SQLAlchemy `engine` (PostgreSQL through the psycopg driver) from `settings`, plus `SessionLocal`, which opens a new session per call.
+
+No tables or endpoints use the database yet.
 
 ## Setup
 
@@ -12,6 +18,17 @@ Dependencies are pinned in `requirements.txt` and installed into the project's `
 
 ```
 .\.venv\Scripts\pip install -r requirements.txt
+```
+
+### Database
+
+The app needs PostgreSQL running locally (Windows service `postgresql-x64-18`) with a `tasks_api` database. Connection settings go in a `.env` file at the repo root: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Only `DB_PASSWORD` is required; the others have defaults in `config.py`. `.env` is gitignored, so never commit it.
+
+To test the connection:
+
+```
+$env:PYTHONPATH = "tasks-api"
+.\.venv\Scripts\python -c "from sqlalchemy import text; from database import engine; print(engine.connect().execute(text('select version()')).scalar())"
 ```
 
 ## Running
@@ -36,9 +53,11 @@ Dev tools (ruff, pytest, httpx) are in `requirements-dev.txt`:
 
 The last line runs a single test. Config is in `pyproject.toml`: `tasks-api/` is on pytest's import path (the hyphen means it can't be a package), and ruff treats it as first-party code.
 
+Run `ruff format --check .` on its own before pushing. With PowerShell's `;`, a ruff failure is easy to miss behind pytest's output.
+
 ## CI
 
-`.github/workflows/ci.yml` runs the same three checks on every PR and on every push to `production`. The PR `production → main` stays open so each push gets checked.
+`.github/workflows/ci.yml` runs the same three checks on every PR and on every push to `production`. The PR `production → main` stays open so each push gets checked. CI has no PostgreSQL and no `.env` yet. Both are needed once tests import `database.py`.
 
 ## Bruno
 
