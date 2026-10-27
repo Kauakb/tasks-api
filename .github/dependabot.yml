@@ -1,0 +1,16 @@
+# Dependabot opens a PR each week when a newer version exists
+version: 2
+updates:
+  # Python packages in requirements.txt and requirements-dev.txt
+  - package-ecosystem: pip
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+
+  # actions used in .github/workflows (checkout, setup-python)
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
