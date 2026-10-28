@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -33,3 +34,13 @@ def create_problem(data: ProblemCreate, db: Annotated[Session, Depends(get_db)])
     db.refresh(problem)
     # the return below return the sqlalchemy object, and problemRead turns into JSON with the id included
     return problem
+
+
+# returns every problem as a JSON list
+@app.get("/problems", response_model=list[ProblemRead])
+def list_problems(db: Annotated[Session, Depends(get_db)]):
+    # select builds the query (SELECT * FROM problems ORDER BY id)
+    # order_by keeps the list in the same order every time
+    query = select(Problem).order_by(Problem.id)
+    # scalars runs it and gives back Problem objects, all() puts them in a list
+    return db.scalars(query).all()
