@@ -3,7 +3,11 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [production]
+    branches: [develop]
+
+# the CI token can only read the repo, even if the repo default changes
+permissions:
+  contents: read
 
 jobs:
   checks:
@@ -22,3 +26,6 @@ jobs:
         run: pytest
         env:
           DB_PASSWORD: ci-not-used
+      # fails if a pinned package has a known security vulnerability
+      - name: pip-audit
+        run: pip-audit -r requirements-dev.txt

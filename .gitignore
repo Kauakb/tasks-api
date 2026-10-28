@@ -6,4 +6,7 @@ __pycache__/
 .venv/
 
 # Secrets (database password, etc.)
+# .env.* also catches copies like .env.local; .env.example has no secrets, so it's kept
 .env
+.env.*
+!.env.example

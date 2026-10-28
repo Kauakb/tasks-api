@@ -24,7 +24,7 @@ Dependencies are pinned in `requirements.txt` and installed into the project's `
 
 ### Database
 
-The app needs PostgreSQL running locally (Windows service `postgresql-x64-18`) with a `tasks_api` database. Connection settings go in a `.env` file at the repo root: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Only `DB_PASSWORD` is required; the others have defaults in `config.py`. `.env` is gitignored, so never commit it.
+The app needs PostgreSQL running locally (Windows service `postgresql-x64-18`) with a `tasks_api` database. Connection settings go in a `.env` file at the repo root: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Only `DB_PASSWORD` is required; the others have defaults in `config.py`. Start from `.env.example` (copy it to `.env`). `.env` and `.env.*` are gitignored, so never commit them; `.env.example` is the one exception and must stay free of real values.
 
 To test the connection:
 
@@ -46,11 +46,11 @@ $env:PYTHONPATH = "tasks-api"
 .\.venv\Scripts\python -m uvicorn main:app --app-dir tasks-api --reload
 ```
 
-Serves on http://127.0.0.1:8000 (interactive docs at `/docs`). `--reload` restarts the server when code changes.
+Serves on http://127.0.0.1:8000 (interactive docs at `/docs`). `--reload` restarts the server when code changes. Keep the default `127.0.0.1` host: the API has no auth, so `--host 0.0.0.0` would expose it to the network.
 
 ## Tests and lint
 
-Dev tools (ruff, pytest, httpx) are in `requirements-dev.txt`:
+Dev tools (ruff, pytest, httpx, pip-audit) are in `requirements-dev.txt`:
 
 ```
 .\.venv\Scripts\pip install -r requirements-dev.txt
@@ -58,21 +58,26 @@ Dev tools (ruff, pytest, httpx) are in `requirements-dev.txt`:
 .\.venv\Scripts\ruff format --check .
 .\.venv\Scripts\pytest
 .\.venv\Scripts\pytest tests/test_main.py::test_home
+.\.venv\Scripts\pip-audit -r requirements-dev.txt
 ```
 
-The last line runs a single test. Config is in `pyproject.toml`: `tasks-api/` is on pytest's import path (the hyphen means it can't be a package), and ruff treats it as first-party code.
+`pytest tests/test_main.py::test_home` runs a single test. `pip-audit` fails when a pinned package has a known vulnerability. Config is in `pyproject.toml`: `tasks-api/` is on pytest's import path (the hyphen means it can't be a package), and ruff treats it as first-party code.
 
-Before every push, run all three checks with this command. It stops at the first failure, so a ruff error can't hide behind pytest's output:
+Before every push, run all four checks with this command. It stops at the first failure, so a ruff error can't hide behind pytest's output:
 
 ```
-.\.venv\Scripts\ruff check .; if ($?) { .\.venv\Scripts\ruff format --check . }; if ($?) { .\.venv\Scripts\pytest }
+.\.venv\Scripts\ruff check .; if ($?) { .\.venv\Scripts\ruff format --check . }; if ($?) { .\.venv\Scripts\pytest }; if ($?) { .\.venv\Scripts\pip-audit -r requirements-dev.txt }
 ```
 
 `if ($?)` runs the next command only if the last one succeeded (PowerShell 5.1 has no `&&`).
 
 ## CI
 
-`.github/workflows/ci.yml` runs the same three checks on every PR and on every push to `production`. The PR `production → main` stays open so each push gets checked. CI sets a placeholder `DB_PASSWORD` for the pytest step, because `main.py` imports `database.py` and `Settings()` requires it. There's no PostgreSQL service yet, so tests must not query the database. Add one (with a matching password) before writing tests that do.
+`.github/workflows/ci.yml` runs the same four checks on every PR and on every push to `develop`, with a read-only token (`permissions: contents: read`). `main` is protected: the `checks` job must pass, and force-push and deletion are blocked. CI sets a placeholder `DB_PASSWORD` for the pytest step, because `main.py` imports `database.py` and `Settings()` requires it. There's no PostgreSQL service yet, so tests must not query the database. Add one (with a matching password) before writing tests that do.
+
+## Security
+
+The repo is public. GitHub secret scanning with push protection, Dependabot alerts and security updates, CodeQL (default setup) and private vulnerability reporting are on. `.github/dependabot.yml` opens weekly update PRs for pip and GitHub Actions against `develop`; Dependabot security-fix PRs target `main` (the default branch). `SECURITY.md` tells reporters to use the private report form.
 
 ## Bruno
 
