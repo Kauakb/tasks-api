@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -6,7 +7,14 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Attempt, Problem
-from schemas import AttemptCreate, AttemptRead, ProblemCreate, ProblemRead
+from review import build_review_list
+from schemas import (
+    AttemptCreate,
+    AttemptRead,
+    ProblemCreate,
+    ProblemRead,
+    ReviewItem,
+)
 
 app = FastAPI()
 
@@ -83,3 +91,13 @@ def list_attempts(problem_id: int, db: Annotated[Session, Depends(get_db)]):
         .order_by(Attempt.created_at, Attempt.id)
     )
     return db.scalars(query).all()
+
+
+# every problem, from most to least urgent to review (formula in review.py)
+@app.get("/review", response_model=list[ReviewItem])
+def review_list(db: Annotated[Session, Depends(get_db)]):
+    problems = db.scalars(select(Problem)).all()
+    # oldest first, so build_review_list keeps the newest attempt per problem
+    query = select(Attempt).order_by(Attempt.created_at, Attempt.id)
+    attempts = db.scalars(query).all()
+    return build_review_list(problems, attempts, datetime.now(UTC))

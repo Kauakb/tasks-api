@@ -27,17 +27,13 @@ class ProblemRead(ProblemCreate):  # inherits from problem create
     id: int
 
 
-# notes are trimmed and can't be longer than 1000 characters
-Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)]
-
-
 # what the client sends to log an attempt
 # (no problem_id: it comes from the URL; no created_at: the database sets it)
 class AttemptCreate(BaseModel):
     minutes: Annotated[int, Field(gt=0)]  # gt = greater than
     confidence: Annotated[int, Field(ge=1, le=5)]  # ge/le = from 1 to 5
     solved: bool
-    notes: Notes | None = None  # optional: leave it out and it's None
+    notes: str | None = None  # optional: leave it out and it's None
 
 
 # what the API sends back: the same fields plus what the server filled in
@@ -47,3 +43,11 @@ class AttemptRead(AttemptCreate):
     id: int
     problem_id: int
     created_at: datetime
+
+
+# one line of the review list (score and last_attempt_at are None
+# for a problem with no attempts yet)
+class ReviewItem(BaseModel):
+    problem: ProblemRead
+    score: int | None
+    last_attempt_at: datetime | None
