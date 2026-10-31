@@ -11,7 +11,7 @@ urgent first.
 - **Single user**, no login.
 - **No screen**: the API is the product. All calls are made with
   [Bruno](https://www.usebruno.com/), sending and receiving JSON.
-- Runs **locally only**, on `http://127.0.0.1:8000`.
+- Runs **locally only**.
 
 ## Requirements
 
@@ -57,9 +57,6 @@ says which variable is missing.
 ```powershell
 .\.venv\Scripts\python -m uvicorn main:app --app-dir tasks-api --reload
 ```
-
-- Check it's up: `GET http://127.0.0.1:8000/health` returns `{"status": "ok"}`.
-- Interactive docs (Swagger): http://127.0.0.1:8000/docs
 
 ## Run the tests
 
