@@ -1,8 +1,9 @@
 # what JSON the API accepts and returns. Pydantic checks every request
 # against these rules; a broken rule becomes a 422 VALIDATION_ERROR
+from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, StringConstraints, model_validator
+from pydantic import BaseModel, Field, StrictBool, StringConstraints, model_validator
 
 Platform = Literal["leetcode", "codesignal", "hackerrank", "other"]
 Difficulty = Literal["easy", "medium", "hard"]
@@ -53,3 +54,23 @@ class ProblemRead(BaseModel):
     platform: str
     topic: str
     difficulty: str
+
+
+# what the client sends to log an attempt
+# (no problem_id: it comes from the URL; no created_at: the database sets it)
+class AttemptCreate(BaseModel):
+    minutes: Annotated[int, Field(gt=0, le=600)]  # more than 0, at most 600
+    confidence: Annotated[int, Field(ge=1, le=5)]  # from 1 to 5
+    # StrictBool: only true/false, not "yes" or 1
+    solved: StrictBool
+    notes: Annotated[str, StringConstraints(max_length=500)] = ""
+
+
+class AttemptRead(BaseModel):
+    id: int
+    problem_id: int
+    minutes: int
+    confidence: int
+    solved: bool
+    notes: str
+    created_at: date  # sent as "YYYY-MM-DD"

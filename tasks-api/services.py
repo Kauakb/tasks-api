@@ -58,3 +58,13 @@ def update_problem(conn: Connection, problem_id: int, changes: dict) -> dict:
 def delete_problem(conn: Connection, problem_id: int) -> None:
     if not repository.delete_problem(conn, problem_id):
         raise NotFoundError(f"Problem {problem_id} not found")
+
+
+def create_attempt(conn: Connection, problem_id: int, attempt: dict) -> dict:
+    get_problem(conn, problem_id)  # 404 if the problem doesn't exist
+    return repository.create_attempt(conn, problem_id, attempt)
+
+
+def list_attempts(conn: Connection, problem_id: int) -> list[dict]:
+    get_problem(conn, problem_id)  # 404 instead of an empty list
+    return repository.list_attempts(conn, problem_id)

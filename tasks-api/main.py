@@ -9,7 +9,15 @@ from psycopg import Connection
 import errors
 import services
 from database import connect, create_tables, get_db
-from schemas import Difficulty, Platform, ProblemCreate, ProblemRead, ProblemUpdate
+from schemas import (
+    AttemptCreate,
+    AttemptRead,
+    Difficulty,
+    Platform,
+    ProblemCreate,
+    ProblemRead,
+    ProblemUpdate,
+)
 
 # each route asks for a connection like this: db: Db
 Db = Annotated[Connection, Depends(get_db)]
@@ -64,3 +72,16 @@ def update_problem(problem_id: int, data: ProblemUpdate, db: Db):
 def delete_problem(problem_id: int, db: Db):
     services.delete_problem(db, problem_id)
     return Response(status_code=204)
+
+
+@app.post(
+    "/problems/{problem_id}/attempts", response_model=AttemptRead, status_code=201
+)
+def create_attempt(problem_id: int, data: AttemptCreate, db: Db):
+    return services.create_attempt(db, problem_id, data.model_dump())
+
+
+# newest to oldest
+@app.get("/problems/{problem_id}/attempts", response_model=list[AttemptRead])
+def list_attempts(problem_id: int, db: Db):
+    return services.list_attempts(db, problem_id)
