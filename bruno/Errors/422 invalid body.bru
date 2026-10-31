@@ -1,0 +1,31 @@
+meta {
+  name: 422 invalid body
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/problems
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "title": "",
+    "platform": "codewars",
+    "topic": "stack",
+    "difficulty": "easy"
+  }
+}
+
+tests {
+  test("status is 422", function () {
+    expect(res.status).to.equal(422);
+  });
+  test("lists the invalid fields", function () {
+    expect(res.body.error).to.equal("VALIDATION_ERROR");
+    const fields = res.body.fields.map((item) => item.field);
+    expect(fields).to.include.members(["title", "platform"]);
+  });
+}
