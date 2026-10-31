@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Query, Response
 from psycopg import Connection
 
 import errors
@@ -17,6 +17,7 @@ from schemas import (
     ProblemCreate,
     ProblemRead,
     ProblemUpdate,
+    ReviewItem,
 )
 
 # each route asks for a connection like this: db: Db
@@ -85,3 +86,9 @@ def create_attempt(problem_id: int, data: AttemptCreate, db: Db):
 @app.get("/problems/{problem_id}/attempts", response_model=list[AttemptRead])
 def list_attempts(problem_id: int, db: Db):
     return services.list_attempts(db, problem_id)
+
+
+# the most urgent problems to review; outside 1-50, limit gives a 422
+@app.get("/review", response_model=list[ReviewItem])
+def review_queue(db: Db, limit: Annotated[int, Query(ge=1, le=50)] = 5):
+    return services.review_queue(db, limit)

@@ -86,6 +86,23 @@ def create_attempt(conn: Connection, problem_id: int, attempt: dict) -> dict:
     ).fetchone()
 
 
+# each problem with its most recent attempt (problems without attempts are
+# left out by the JOIN). DISTINCT ON (p.id) keeps the first row per problem,
+# and ORDER BY makes that first row the newest attempt
+def latest_attempts(conn: Connection) -> list[dict]:
+    return conn.execute(
+        """
+        SELECT DISTINCT ON (p.id)
+            p.id, p.title, p.platform, p.topic, p.difficulty,
+            a.solved, a.confidence,
+            CURRENT_DATE - a.created_at AS days
+        FROM problems p
+        JOIN attempts a ON a.problem_id = p.id
+        ORDER BY p.id, a.created_at DESC, a.id DESC
+        """
+    ).fetchall()
+
+
 # newest first; on the same date, the one saved last comes first
 def list_attempts(conn: Connection, problem_id: int) -> list[dict]:
     return conn.execute(

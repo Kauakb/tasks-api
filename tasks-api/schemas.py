@@ -74,3 +74,9 @@ class AttemptRead(BaseModel):
     solved: bool
     notes: str
     created_at: date  # sent as "YYYY-MM-DD"
+
+
+# one item of the review queue
+class ReviewItem(BaseModel):
+    problem: ProblemRead
+    score: int

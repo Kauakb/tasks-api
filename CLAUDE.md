@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-The spec is the PRD *Interview Preparation Tracker* v1.0 (15 user stories, GitHub issues #13-#27, US-n = #(12+n)). Built so far: US-01 to US-10 and US-13/US-14. Not built: US-11 (review queue) and US-12 (stats).
+The spec is the PRD *Interview Preparation Tracker* v1.0 (15 user stories, GitHub issues #13-#27, US-n = #(12+n)). Built so far: US-01 to US-11, US-13 and US-14. Not built: US-12 (stats). The review formula (US-11) is fixed by the PRD; explain any change to it before making it.
 
 The app code lives in the nested `tasks-api/` directory inside the repo root. Tests are in `tests/`. The PRD forbids an ORM: SQL is written by hand. Layers, in order:
 
 - `main.py`: routes only. Turns HTTP into calls to `services` and returns the right status. Gets a connection with `Db = Annotated[Connection, Depends(get_db)]`.
 - `services.py`: product rules (existence, duplicate title per platform). Raises `NotFoundError` / `ConflictError` and knows nothing about HTTP.
+- `review.py`: the review queue's urgency formula and ordering, as pure functions (no database, no HTTP). Fed by `repository.latest_attempts`.
 - `repository.py`: the only file with SQL. Values always go in as parameters (`%(name)s`). Column names in dynamic SQL use `psycopg.sql.Identifier`.
 - `errors.py`: exception handlers. Every error is `{"error": "CODE", "message": "..."}`, plus `fields` on 422.
 - `schemas.py`: Pydantic request/response models. Allowed values and text rules live here (and as constraints in `schema.sql`).
@@ -71,4 +72,4 @@ The repo is public. GitHub secret scanning with push protection, Dependabot aler
 
 ## Bruno
 
-The collection is in `bruno/`, laid out as the PRD asks: folders `Health`, `Problems`, `Attempts`, `Errors`, ordered by `seq` in each `folder.bru`. The `local` environment sets `base_url`. "Create problem" saves `problem_id` and `problem_title` for the later requests. Every request has `tests`. Keep it in sync when endpoints change.
+The collection is in `bruno/`, laid out as the PRD asks: folders `Health`, `Problems`, `Attempts`, `Insights`, `Errors`, ordered by `seq` in each `folder.bru`. The `local` environment sets `base_url`. "Create problem" saves `problem_id` and `problem_title` for the later requests. Every request has `tests`. Keep it in sync when endpoints change.

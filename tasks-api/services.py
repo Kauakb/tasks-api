@@ -3,6 +3,7 @@
 from psycopg import Connection
 
 import repository
+import review
 
 
 class NotFoundError(Exception):
@@ -68,3 +69,7 @@ def create_attempt(conn: Connection, problem_id: int, attempt: dict) -> dict:
 def list_attempts(conn: Connection, problem_id: int) -> list[dict]:
     get_problem(conn, problem_id)  # 404 instead of an empty list
     return repository.list_attempts(conn, problem_id)
+
+
+def review_queue(conn: Connection, limit: int) -> list[dict]:
+    return review.build_queue(repository.latest_attempts(conn), limit)

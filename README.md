@@ -4,7 +4,9 @@
 
 A local REST API that records the coding interview problems you practice
 (LeetCode, HackerRank, CodeSignal) and every attempt at them: how long it
-took, whether you solved it and how confident you felt.
+took, whether you solved it and how confident you felt. From that history,
+it returns a **review queue**: the problems that most need practice, most
+urgent first.
 
 - **Single user**, no login.
 - **No screen**: the API is the product. All calls are made with
@@ -76,7 +78,7 @@ so your real data is never touched.
 2. Select the **local** environment (it sets `base_url = http://127.0.0.1:8000`).
 3. With the API running, open the collection's **Runner** and run everything.
 
-The folders run in order: `Health`, `Problems`, `Attempts`, `Errors`.
+The folders run in order: `Health`, `Problems`, `Attempts`, `Insights`, `Errors`.
 "Create problem" saves the new problem's id in `{{problem_id}}`, and the next
 requests use it. Every request has tests for the status and the body.
 
@@ -92,6 +94,7 @@ requests use it. Every request has tests for the status and the body.
 | DELETE | `/problems/{id}` | Deletes a problem and its attempts | 204 | 404, 422 |
 | POST | `/problems/{id}/attempts` | Logs an attempt | 201 | 404, 422 |
 | GET | `/problems/{id}/attempts` | Attempt history, newest first | 200 | 404, 422 |
+| GET | `/review?limit=5` | Review queue, most urgent first | 200 | 422 |
 
 ### Rules
 
@@ -114,6 +117,46 @@ POST /problems
 201 Created
 {"id": 1, "title": "Valid Parentheses", "platform": "leetcode", "topic": "stack", "difficulty": "easy"}
 ```
+
+### Review queue
+
+`GET /review` scores each problem from its **most recent attempt**:
+
+| Rule | Points |
+|---|---|
+| Not solved | +50 |
+| Each confidence point below 5 | +10 |
+| Each day since the attempt (at most 30) | +1 |
+
+Example: not solved (+50), confidence 2 (3 points below 5, so +30), 4 days
+ago (+4) = **84**.
+
+- Highest score first. On a tie, the smaller `id` comes first.
+- Problems with no attempts are left out.
+- `limit` is optional: 5 by default, 1 to 50 (anything else is a 422).
+
+```http
+GET /review?limit=2
+```
+
+```json
+[
+  {"problem": {"id": 2, "title": "Valid Parentheses", "platform": "leetcode", "topic": "stack", "difficulty": "easy"}, "score": 84},
+  {"problem": {"id": 1, "title": "Two Sum", "platform": "leetcode", "topic": "hashmap", "difficulty": "easy"}, "score": 31}
+]
+```
+
+**How the queue is built.** SQL picks each problem's newest attempt
+(`DISTINCT ON`, in `repository.latest_attempts`). A pure function
+(`review.urgency`) gives each one a score. Then `sorted` orders them by
+(-score, id) and the first `limit` items are returned.
+
+- **Why `sorted` and not `heapq`:** `sorted` is **O(n log n)** for n
+  problems. `heapq.nsmallest(limit, ...)` would be **O(n log k)** (k =
+  limit), which only matters with a very large n. One person's catalog has
+  hundreds of problems at most, so the simpler and more readable `sorted`
+  wins.
+- **Memory:** O(n), one score per problem.
 
 ### Errors
 
@@ -159,6 +202,7 @@ route (main.py) -> service (services.py) -> repository (repository.py) -> Postgr
 |---|---|---|
 | Route | `main.py` | Turns HTTP into Python calls and returns the right status. No product rules. |
 | Service | `services.py` | Product rules (problem exists? duplicate?). Raises `NotFoundError` / `ConflictError` and knows nothing about HTTP. |
+| Review | `review.py` | The urgency formula and the queue order, as pure functions (no database, no HTTP). |
 | Repository | `repository.py` | The only place with SQL. |
 | Errors | `errors.py` | Turns every error into the standard JSON shape. |
 | Schemas | `schemas.py` | What JSON is accepted and returned (Pydantic). |
@@ -169,6 +213,7 @@ route (main.py) -> service (services.py) -> repository (repository.py) -> Postgr
 tasks-api/          the application
   main.py           routes
   services.py       product rules and domain errors
+  review.py         review queue formula (pure functions)
   repository.py     SQL
   schema.sql        the two tables
   database.py       connection (psycopg)
