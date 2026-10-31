@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -24,3 +25,29 @@ class ProblemRead(ProblemCreate):  # inherits from problem create
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+# what the client sends to log an attempt
+# (no problem_id: it comes from the URL; no created_at: the database sets it)
+class AttemptCreate(BaseModel):
+    minutes: Annotated[int, Field(gt=0)]  # gt = greater than
+    confidence: Annotated[int, Field(ge=1, le=5)]  # ge/le = from 1 to 5
+    solved: bool
+    notes: str | None = None  # optional: leave it out and it's None
+
+
+# what the API sends back: the same fields plus what the server filled in
+class AttemptRead(AttemptCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    problem_id: int
+    created_at: datetime
+
+
+# one line of the review list (score and last_attempt_at are None
+# for a problem with no attempts yet)
+class ReviewItem(BaseModel):
+    problem: ProblemRead
+    score: int | None
+    last_attempt_at: datetime | None
