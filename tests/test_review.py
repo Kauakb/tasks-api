@@ -1,58 +1,110 @@
-from datetime import UTC, datetime, timedelta
-
-from models import Attempt, Problem
-from review import build_review_list
-
-NOW = datetime(2026, 10, 31, 12, 0, tzinfo=UTC)
+from review import build_queue, urgency
 
 
-# model objects built in memory: this test never touches the database
-def make_problem(problem_id: int, title: str) -> Problem:
-    return Problem(
-        id=problem_id,
-        title=title,
-        platform="leetcode",
-        topics=["array"],
-        difficulty="easy",
+def row(problem_id: int, solved: bool, confidence: int, days: int) -> dict:
+    return {
+        "id": problem_id,
+        "title": f"Problem {problem_id}",
+        "platform": "leetcode",
+        "topic": "stack",
+        "difficulty": "easy",
+        "solved": solved,
+        "confidence": confidence,
+        "days": days,
+    }
+
+
+# the pure functions (no database)
+
+
+def test_urgency_example_from_the_prd():
+    # not solved (+50), confidence 2 (3 x 10 = +30), 4 days ago (+4)
+    assert urgency(solved=False, confidence=2, days=4) == 84
+
+
+def test_urgency_days_are_capped_at_30():
+    assert urgency(solved=True, confidence=5, days=45) == 30
+    assert urgency(solved=True, confidence=5, days=0) == 0
+
+
+def test_queue_order_tie_and_limit():
+    rows = [
+        row(1, solved=True, confidence=4, days=1),  # 0 + 10 + 1 = 11
+        row(2, solved=False, confidence=2, days=4),  # 50 + 30 + 4 = 84
+        row(3, solved=True, confidence=3, days=0),  # 0 + 20 + 0 = 20
+        row(4, solved=True, confidence=4, days=1),  # 11, ties with id 1
+    ]
+    queue = build_queue(rows, limit=5)
+    assert [(item["problem"]["id"], item["score"]) for item in queue] == [
+        (2, 84),
+        (3, 20),
+        (1, 11),
+        (4, 11),
+    ]
+    assert len(build_queue(rows, limit=2)) == 2
+
+
+def test_queue_without_data():
+    assert build_queue([], limit=5) == []
+
+
+# the endpoint (test database)
+
+PROBLEM = {"platform": "leetcode", "topic": "stack", "difficulty": "easy"}
+
+
+def add_problem(client, title: str) -> int:
+    return client.post("/problems", json={**PROBLEM, "title": title}).json()["id"]
+
+
+def add_attempt(client, problem_id: int, solved: bool, confidence: int) -> None:
+    body = {"minutes": 20, "confidence": confidence, "solved": solved}
+    client.post(f"/problems/{problem_id}/attempts", json=body)
+
+
+def test_review_endpoint(client, db):
+    two_sum = add_problem(client, "Two Sum")
+    valid = add_problem(client, "Valid Parentheses")
+    add_problem(client, "Never tried")  # no attempts: left out of the queue
+
+    add_attempt(client, two_sum, solved=True, confidence=4)
+    add_attempt(client, valid, solved=True, confidence=5)
+    add_attempt(client, valid, solved=False, confidence=2)  # newest one counts
+    # move Valid Parentheses' attempts 4 days into the past
+    db.execute(
+        "UPDATE attempts SET created_at = CURRENT_DATE - 4 WHERE problem_id = %s",
+        (valid,),
     )
 
-
-def make_attempt(problem_id: int, solved: bool, confidence: int, days_ago: int):
-    return Attempt(
-        problem_id=problem_id,
-        minutes=20,
-        confidence=confidence,
-        solved=solved,
-        created_at=NOW - timedelta(days=days_ago),
-    )
-
-
-# the example from issue #12
-def test_review_list_order():
-    problems = [
-        make_problem(1, "Two Sum"),
-        make_problem(2, "Valid Parentheses"),
-        make_problem(3, "Merge Intervals"),
-        make_problem(4, "Climbing Stairs"),
-        make_problem(5, "LRU Cache"),
+    response = client.get("/review")
+    assert response.status_code == 200
+    assert [(item["problem"]["title"], item["score"]) for item in response.json()] == [
+        ("Valid Parentheses", 84),
+        ("Two Sum", 10),
     ]
-    # oldest first, like the endpoint's query
-    attempts = [
-        make_attempt(3, solved=True, confidence=5, days_ago=45),
-        make_attempt(1, solved=False, confidence=1, days_ago=10),
-        make_attempt(1, solved=True, confidence=2, days_ago=3),
-        make_attempt(4, solved=True, confidence=3, days_ago=2),
-        make_attempt(2, solved=False, confidence=2, days_ago=1),
-    ]
+    assert response.json()[0]["problem"] == {
+        "id": valid,
+        "title": "Valid Parentheses",
+        **PROBLEM,
+    }
 
-    result = build_review_list(problems, attempts, NOW)
 
-    titles = [item["problem"].title for item in result]
-    assert titles == [
-        "Two Sum",  # 40 + 3 (only its newest attempt counts)
-        "Valid Parentheses",  # 30 + 1
-        "Merge Intervals",  # 10 + 15 (time is capped)
-        "Climbing Stairs",  # 20 + 2
-        "LRU Cache",  # no attempts: at the bottom
-    ]
-    assert [item["score"] for item in result] == [43, 31, 25, 22, None]
+def test_review_limit(client):
+    for number in range(3):
+        problem_id = add_problem(client, f"Problem {number}")
+        add_attempt(client, problem_id, solved=False, confidence=1)
+    assert len(client.get("/review").json()) == 3
+    assert len(client.get("/review", params={"limit": 2}).json()) == 2
+
+
+def test_review_invalid_limit(client):
+    for limit in (0, 51, "abc"):
+        response = client.get("/review", params={"limit": limit})
+        assert response.status_code == 422
+        assert response.json()["fields"][0]["field"] == "limit"
+
+
+def test_review_without_data(client):
+    response = client.get("/review")
+    assert response.status_code == 200
+    assert response.json() == []

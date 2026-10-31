@@ -12,6 +12,21 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    # a throwaway PostgreSQL for the tests, deleted when the job ends
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tasks_api_test
+        ports:
+          - 5432:5432
+        # wait until the database accepts connections before the steps run
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,7 +40,7 @@ jobs:
       - name: pytest
         run: pytest
         env:
-          DB_PASSWORD: ci-not-used
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tasks_api_test
       # fails if a pinned package has a known security vulnerability
       - name: pip-audit
         run: pip-audit -r requirements-dev.txt

@@ -1,0 +1,27 @@
+meta {
+  name: Update problem
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{base_url}}/problems/{{problem_id}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "difficulty": "medium"
+  }
+}
+
+tests {
+  test("status is 200", function () {
+    expect(res.status).to.equal(200);
+  });
+  test("only the difficulty changed", function () {
+    expect(res.body.difficulty).to.equal("medium");
+    expect(res.body.title).to.equal(bru.getVar("problem_title"));
+  });
+}

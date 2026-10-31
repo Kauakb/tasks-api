@@ -1,103 +1,94 @@
-from datetime import UTC, datetime
+# the routes: they turn HTTP into calls to services.py and return the right
+# status. No product rules here
+from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from fastapi import Depends, FastAPI, Query, Response
+from psycopg import Connection
 
-from database import get_db
-from models import Attempt, Problem
-from review import build_review_list
+import errors
+import services
+from database import connect, create_tables, get_db
 from schemas import (
     AttemptCreate,
     AttemptRead,
+    Difficulty,
+    Platform,
     ProblemCreate,
     ProblemRead,
+    ProblemUpdate,
     ReviewItem,
 )
 
-app = FastAPI()
+# each route asks for a connection like this: db: Db
+Db = Annotated[Connection, Depends(get_db)]
 
 
-@app.get("/")
-def home():
-    return {"message": "hello"}
+# runs once when the API starts: makes sure the tables exist
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    with connect() as conn:
+        create_tables(conn)
+    yield
 
 
-@app.get("/about")
-def about():
-    return {"project": "tasks-api", "author": "Kaua B"}
+app = FastAPI(title="Interview Preparation Tracker", lifespan=lifespan)
+errors.register(app)
 
 
-# this runs the function when post request
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.post("/problems", response_model=ProblemRead, status_code=201)
-def create_problem(data: ProblemCreate, db: Annotated[Session, Depends(get_db)]):
-    # model dump turns a schema into a dict: {title: two sum, platform, leetcode}
-    problem = Problem(**data.model_dump())
-    # this tells the sessions that we want to save it / nothing goes to DB yet
-    db.add(problem)
-    # now the insert actually runs and saved. postgre creates the id
-    db.commit()
-    # reloads the row from the db, so problem.id has the new value
-    db.refresh(problem)
-    # the return below return the sqlalchemy object, and problemRead turns into JSON with the id included
-    return problem
+def create_problem(data: ProblemCreate, db: Db):
+    return services.create_problem(db, data.model_dump())
 
 
-# returns every problem as a JSON list
+# the filters come from the URL: /problems?topic=stack&difficulty=easy
 @app.get("/problems", response_model=list[ProblemRead])
-def list_problems(db: Annotated[Session, Depends(get_db)]):
-    # select builds the query (SELECT * FROM problems ORDER BY id)
-    # order_by keeps the list in the same order every time
-    query = select(Problem).order_by(Problem.id)
-    # scalars runs it and gives back Problem objects, all() puts them in a list
-    return db.scalars(query).all()
+def list_problems(
+    db: Db,
+    topic: str | None = None,
+    difficulty: Difficulty | None = None,
+    platform: Platform | None = None,
+):
+    return services.list_problems(db, topic, difficulty, platform)
 
 
-# stops the request with a 404 error when the problem doesn't exist
-def get_problem_or_404(db: Session, problem_id: int) -> Problem:
-    # db.get looks up one row by its primary key, None if there's no such row
-    problem = db.get(Problem, problem_id)
-    if problem is None:
-        raise HTTPException(status_code=404, detail="Problem not found")
-    return problem
+@app.get("/problems/{problem_id}", response_model=ProblemRead)
+def get_problem(problem_id: int, db: Db):
+    return services.get_problem(db, problem_id)
 
 
-# {problem_id} in the URL becomes the problem_id parameter, e.g. /problems/3/attempts
+@app.patch("/problems/{problem_id}", response_model=ProblemRead)
+def update_problem(problem_id: int, data: ProblemUpdate, db: Db):
+    # exclude_unset: only the fields the client sent
+    return services.update_problem(db, problem_id, data.model_dump(exclude_unset=True))
+
+
+# 204 No Content: success, with an empty body
+@app.delete("/problems/{problem_id}", status_code=204)
+def delete_problem(problem_id: int, db: Db):
+    services.delete_problem(db, problem_id)
+    return Response(status_code=204)
+
+
 @app.post(
     "/problems/{problem_id}/attempts", response_model=AttemptRead, status_code=201
 )
-def create_attempt(
-    problem_id: int, data: AttemptCreate, db: Annotated[Session, Depends(get_db)]
-):
-    get_problem_or_404(db, problem_id)
-    # the body has the attempt fields, the URL gives the problem it belongs to
-    attempt = Attempt(**data.model_dump(), problem_id=problem_id)
-    db.add(attempt)
-    db.commit()
-    # reloads id and created_at, which the database filled in
-    db.refresh(attempt)
-    return attempt
+def create_attempt(problem_id: int, data: AttemptCreate, db: Db):
+    return services.create_attempt(db, problem_id, data.model_dump())
 
 
-# returns every attempt at one problem, oldest first
+# newest to oldest
 @app.get("/problems/{problem_id}/attempts", response_model=list[AttemptRead])
-def list_attempts(problem_id: int, db: Annotated[Session, Depends(get_db)]):
-    get_problem_or_404(db, problem_id)
-    # where filters the rows: SELECT * FROM attempts WHERE problem_id = ...
-    query = (
-        select(Attempt)
-        .where(Attempt.problem_id == problem_id)
-        .order_by(Attempt.created_at, Attempt.id)
-    )
-    return db.scalars(query).all()
+def list_attempts(problem_id: int, db: Db):
+    return services.list_attempts(db, problem_id)
 
 
-# every problem, from most to least urgent to review (formula in review.py)
+# the most urgent problems to review; outside 1-50, limit gives a 422
 @app.get("/review", response_model=list[ReviewItem])
-def review_list(db: Annotated[Session, Depends(get_db)]):
-    problems = db.scalars(select(Problem)).all()
-    # oldest first, so build_review_list keeps the newest attempt per problem
-    query = select(Attempt).order_by(Attempt.created_at, Attempt.id)
-    attempts = db.scalars(query).all()
-    return build_review_list(problems, attempts, datetime.now(UTC))
+def review_queue(db: Db, limit: Annotated[int, Query(ge=1, le=50)] = 5):
+    return services.review_queue(db, limit)

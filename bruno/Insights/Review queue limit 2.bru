@@ -1,0 +1,24 @@
+meta {
+  name: Review queue limit 2
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/review?limit=2
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 2
+}
+
+tests {
+  test("status is 200", function () {
+    expect(res.status).to.equal(200);
+  });
+  test("at most 2 items", function () {
+    expect(res.body.length).to.be.within(1, 2);
+  });
+}

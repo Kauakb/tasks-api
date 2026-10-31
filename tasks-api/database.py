@@ -1,32 +1,27 @@
-# this builds the connection address, create_engine opens the connection pool.
-from sqlalchemy import URL, create_engine
+# the connection to PostgreSQL, using the psycopg driver (no ORM:
+# all the SQL is written by hand in repository.py)
+from pathlib import Path
 
-# sessionmaker is a factory, calling it gives a new session
-#  establishes all conversations with the database
-from sqlalchemy.orm import sessionmaker
+import psycopg
+from psycopg.rows import dict_row
 
 from config import settings
 
-# the address of the db, built from the values in .env
-# postgresql+psycopg means postgresql, using the psycopg driver.
-# psycopg driver is a postgre db adapter for python.
-database_URL = URL.create(
-    drivername="postgresql+psycopg",
-    username=settings.db_user,
-    password=settings.db_password,
-    host=settings.db_host,
-    port=settings.db_port,
-    database=settings.db_name,
-)
-
-# one engine for the whole app
-engine = create_engine(database_URL)
-
-# each call to sessionlocal() opens a new session that uses the engine
-SessionLocal = sessionmaker(bind=engine)
+SCHEMA_FILE = Path(__file__).parent / "schema.sql"
 
 
-# gives each request its own session, and closes it when request ends
+def connect() -> psycopg.Connection:
+    # autocommit: each SQL statement is saved as soon as it runs
+    # dict_row: each row comes back as a dict, e.g. {"id": 1, "title": "Two Sum"}
+    return psycopg.connect(settings.database_url, autocommit=True, row_factory=dict_row)
+
+
+# creates the tables that don't exist yet (runs when the API starts)
+def create_tables(conn: psycopg.Connection) -> None:
+    conn.execute(SCHEMA_FILE.read_text(encoding="utf-8"))
+
+
+# gives each request its own connection, and closes it when the request ends
 def get_db():
-    with SessionLocal() as db:
-        yield db
+    with connect() as conn:
+        yield conn

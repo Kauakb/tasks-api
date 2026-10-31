@@ -1,0 +1,32 @@
+meta {
+  name: 409 duplicate problem
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/problems
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "title": "{{problem_title}}",
+    "platform": "leetcode",
+    "topic": "stack",
+    "difficulty": "easy"
+  }
+}
+
+tests {
+  test("status is 409", function () {
+    expect(res.status).to.equal(409);
+  });
+  test("standard error body", function () {
+    expect(res.body.error).to.equal("CONFLICT");
+    expect(res.body.message).to.equal(
+      "Problem '" + bru.getVar("problem_title") + "' already exists on leetcode"
+    );
+  });
+}

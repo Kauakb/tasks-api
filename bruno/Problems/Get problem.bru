@@ -1,0 +1,21 @@
+meta {
+  name: Get problem
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/problems/{{problem_id}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function () {
+    expect(res.status).to.equal(200);
+  });
+  test("returns the problem", function () {
+    expect(res.body.id).to.equal(bru.getVar("problem_id"));
+    expect(res.body.title).to.equal(bru.getVar("problem_title"));
+  });
+}

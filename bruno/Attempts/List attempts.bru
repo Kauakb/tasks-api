@@ -1,0 +1,23 @@
+meta {
+  name: List attempts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/problems/{{problem_id}}/attempts
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function () {
+    expect(res.status).to.equal(200);
+  });
+  test("returns the problem's attempts", function () {
+    expect(res.body.length).to.be.above(0);
+    res.body.forEach((attempt) =>
+      expect(attempt.problem_id).to.equal(bru.getVar("problem_id"))
+    );
+  });
+}
