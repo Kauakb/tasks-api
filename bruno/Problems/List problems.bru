@@ -1,0 +1,22 @@
+meta {
+  name: List problems
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/problems
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function () {
+    expect(res.status).to.equal(200);
+  });
+  test("returns a list with the created problem", function () {
+    expect(res.body).to.be.an("array");
+    const ids = res.body.map((problem) => problem.id);
+    expect(ids).to.include(bru.getVar("problem_id"));
+  });
+}

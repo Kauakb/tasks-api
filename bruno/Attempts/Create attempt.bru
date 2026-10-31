@@ -1,0 +1,31 @@
+meta {
+  name: Create attempt
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/problems/{{problem_id}}/attempts
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "minutes": 25,
+    "confidence": 2,
+    "solved": false,
+    "notes": "Forgot the empty stack"
+  }
+}
+
+tests {
+  test("status is 201", function () {
+    expect(res.status).to.equal(201);
+  });
+  test("returns the attempt with problem_id and today's date", function () {
+    expect(res.body.id).to.be.a("number");
+    expect(res.body.problem_id).to.equal(bru.getVar("problem_id"));
+    expect(res.body.created_at).to.match(/^\d{4}-\d{2}-\d{2}$/);
+  });
+}

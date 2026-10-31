@@ -1,0 +1,23 @@
+meta {
+  name: 404 problem not found
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/problems/999999
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 404", function () {
+    expect(res.status).to.equal(404);
+  });
+  test("standard error body", function () {
+    expect(res.body).to.eql({
+      error: "NOT_FOUND",
+      message: "Problem 999999 not found",
+    });
+  });
+}

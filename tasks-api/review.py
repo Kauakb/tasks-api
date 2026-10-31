@@ -1,65 +1,39 @@
-# the review list: decides how urgent it is to practice each problem again.
-# only the last attempt at a problem counts. No database code here, so the
-# formula can be tested with plain objects.
-from datetime import datetime
+# the review queue: which problems need practice most. Pure functions
+# (no database, no HTTP), so they're easy to test and explain.
+#
+# urgency comes from a problem's most recent attempt:
+#   +50 if it wasn't solved
+#   +10 for each confidence point below 5 (confidence 2 -> 3 x 10 = 30)
+#   +1 per day since the attempt, at most 30
 
-from models import Attempt, Problem
-
-# time adds at most 15 points, so it lifts a problem one group at most
-# (the groups below are 10 points apart)
-MAX_TIME_POINTS = 15
-
-
-# points for how the last attempt went: higher = more urgent
-def outcome_points(solved: bool, confidence: int) -> int:
-    if solved and confidence <= 2:
-        return 40  # solved, but you don't really know it yet
-    if not solved:
-        return 30
-    if confidence == 3:
-        return 20
-    return 10  # solved with confidence 4 or 5: you know it well
+MAX_DAY_POINTS = 30
 
 
-# score = how it went + 1 point per day since, up to the maximum
-def urgency_score(solved: bool, confidence: int, days: int) -> int:
-    return outcome_points(solved, confidence) + min(days, MAX_TIME_POINTS)
+def urgency(solved: bool, confidence: int, days: int) -> int:
+    score = 0 if solved else 50
+    score += (5 - confidence) * 10
+    score += min(days, MAX_DAY_POINTS)
+    return score
 
 
-# builds the ordered list. attempts must come oldest first,
-# so the last one saved for each problem is its most recent attempt
-def build_review_list(
-    problems: list[Problem], attempts: list[Attempt], now: datetime
-) -> list[dict]:
-    last_attempt = {}
-    for attempt in attempts:
-        last_attempt[attempt.problem_id] = attempt
-
-    attempted = []
-    not_attempted = []
-    for problem in problems:
-        attempt = last_attempt.get(problem.id)
-        if attempt is None:
-            not_attempted.append(
-                {
-                    "problem": problem,
-                    "score": None,
-                    "last_attempt_at": None,
-                }
-            )
-            continue
-        # .days = whole days, so an attempt from earlier today counts as 0
-        days = (now - attempt.created_at).days
-        attempted.append(
-            {
-                "problem": problem,
-                "score": urgency_score(attempt.solved, attempt.confidence, days),
-                "last_attempt_at": attempt.created_at,
-            }
-        )
-
-    # highest score first; on a tie, the older last attempt comes first
-    attempted.sort(key=lambda item: (-item["score"], item["last_attempt_at"]))
-    # problems with no attempts go at the bottom, in the order they were added
-    not_attempted.sort(key=lambda item: item["problem"].id)
-    return attempted + not_attempted
+# rows: one per problem, with its last attempt's solved, confidence and days.
+# returns the "limit" most urgent problems: highest score first, and on a
+# tie the smaller id first
+def build_queue(rows: list[dict], limit: int) -> list[dict]:
+    queue = [
+        {
+            "problem": {
+                "id": row["id"],
+                "title": row["title"],
+                "platform": row["platform"],
+                "topic": row["topic"],
+                "difficulty": row["difficulty"],
+            },
+            "score": urgency(row["solved"], row["confidence"], row["days"]),
+        }
+        for row in rows
+    ]
+    # -score puts the highest score first; id breaks ties (smaller first).
+    # sorted is O(n log n); see "Review queue" in the README for why
+    queue = sorted(queue, key=lambda item: (-item["score"], item["problem"]["id"]))
+    return queue[:limit]

@@ -1,0 +1,27 @@
+meta {
+  name: Review queue
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/review
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function () {
+    expect(res.status).to.equal(200);
+  });
+  test("at most 5 items (the default limit), most urgent first", function () {
+    expect(res.body).to.be.an("array");
+    expect(res.body.length).to.be.within(1, 5);
+    const scores = res.body.map((item) => item.score);
+    expect(scores).to.eql([...scores].sort((a, b) => b - a));
+  });
+  test("each item has the problem and its score", function () {
+    expect(res.body[0].problem.id).to.be.a("number");
+    expect(res.body[0].score).to.be.a("number");
+  });
+}

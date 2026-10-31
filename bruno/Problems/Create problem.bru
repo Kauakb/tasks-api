@@ -1,0 +1,42 @@
+meta {
+  name: Create problem
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/problems
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "title": "Valid Parentheses {{run_id}}",
+    "platform": "leetcode",
+    "topic": "stack",
+    "difficulty": "easy"
+  }
+}
+
+script:pre-request {
+  // a different title on every run, so running the collection again doesn't get 409
+  bru.setVar("run_id", Date.now());
+}
+
+script:post-response {
+  // the next requests use these as {{problem_id}} and {{problem_title}}
+  bru.setVar("problem_id", res.body.id);
+  bru.setVar("problem_title", res.body.title);
+}
+
+tests {
+  test("status is 201", function () {
+    expect(res.status).to.equal(201);
+  });
+  test("returns the created problem", function () {
+    expect(res.body.id).to.be.a("number");
+    expect(res.body.title).to.equal("Valid Parentheses " + bru.getVar("run_id"));
+    expect(res.body.topic).to.equal("stack");
+  });
+}

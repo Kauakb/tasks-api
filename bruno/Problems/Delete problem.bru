@@ -1,0 +1,31 @@
+meta {
+  name: Delete problem
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{base_url}}/problems/{{delete_id}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // creates a throwaway problem to delete, so {{problem_id}} stays
+  // available for the Attempts requests
+  const axios = require("axios");
+  const response = await axios.post(bru.getEnvVar("base_url") + "/problems", {
+    title: "Problem to delete " + Date.now(),
+    platform: "other",
+    topic: "temp",
+    difficulty: "easy",
+  });
+  bru.setVar("delete_id", response.data.id);
+}
+
+tests {
+  test("status is 204 with no body", function () {
+    expect(res.status).to.equal(204);
+    expect(res.body).to.be.oneOf(["", null, undefined]);
+  });
+}
